@@ -1,0 +1,216 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Greg Kerr <kerrnel@chromium.org>
+Date: Fri, 12 Oct 2018 16:44:31 +0000
+Subject: Revert "Reland "macOS V2 Sandbox: Remove the feature flags.""
+
+This reverts commit 4173f2019d1dada6fa06afa9b3bf7339f0ebcb01.
+
+Reason for revert: The dependent CL was reverted so this has to be reverted.
+
+https://chromium-review.googlesource.com/c/chromium/src/+/1278162
+
+Original change's description:
+> Reland "macOS V2 Sandbox: Remove the feature flags."
+>
+> This is a reland of 5c4908e8ad7f53e2ddb2cd5631dc701558704b8c
+>
+> Original change's description:
+> > macOS V2 Sandbox: Remove the feature flags.
+> >
+> > The V2 sandbox is now default for all but the network and GPU processes
+> > on macOS. This CL deletes the feature flag. A new experiment will be
+> > introduced for the GPU process. The default case for the sandbox profile
+> > switch is removed, because previous CHECK() failures were confusing to
+> > diagnose. All profiles must now be handled explicitly, so Chrome won't
+> > build if a new profile type isn't handled.
+> >
+> > Bug: 749839
+> > CQ-Depend: 1268671
+> > Change-Id: I0860d3a5148b0085be6a99dc01c4971602ee5582
+> > Reviewed-on: https://chromium-review.googlesource.com/c/1269996
+> > Reviewed-by: Robert Sesek <rsesek@chromium.org>
+> > Reviewed-by: Mark Pearson <mpearson@chromium.org>
+> > Reviewed-by: Avi Drissman <avi@chromium.org>
+> > Commit-Queue: Greg Kerr <kerrnel@chromium.org>
+> > Cr-Commit-Position: refs/heads/master@{#598128}
+>
+> CQ-DEPEND=CL:1268671
+>
+> Bug: 749839
+> Change-Id: I91544907b640c572823f3aae3e29c0cfa003da51
+> Reviewed-on: https://chromium-review.googlesource.com/c/1274888
+> Reviewed-by: Avi Drissman <avi@chromium.org>
+> Reviewed-by: Greg Kerr <kerrnel@chromium.org>
+> Reviewed-by: Mark Pearson <mpearson@chromium.org>
+> Commit-Queue: Greg Kerr <kerrnel@chromium.org>
+> Cr-Commit-Position: refs/heads/master@{#598822}
+
+TBR=avi@chromium.org,mpearson@chromium.org,kerrnel@chromium.org,rsesek@chromium.org,mark@chromium.org
+
+Change-Id: I301c95634bd447d35ef19948cf0488c0bf847e58
+No-Presubmit: true
+No-Tree-Checks: true
+No-Try: true
+Bug: 749839
+Reviewed-on: https://chromium-review.googlesource.com/c/1278861
+Reviewed-by: Greg Kerr <kerrnel@chromium.org>
+Commit-Queue: Greg Kerr <kerrnel@chromium.org>
+Cr-Commit-Position: refs/heads/master@{#599248}
+
+diff --git a/chrome/browser/about_flags.cc b/chrome/browser/about_flags.cc
+index db54ccb61b9dd191bb4a82608999300797213402..74c37c9f0ed0422f2dbdd421e9427c9e8b4db543 100644
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -2399,6 +2399,9 @@ const FeatureEntry kFeatureEntries[] = {
+      SINGLE_VALUE_TYPE(switches::kTrySupportedChannelLayouts)},
+ #endif  // OS_WIN
+ #if defined(OS_MACOSX)
++    {"mac-v2-sandbox", flag_descriptions::kMacV2SandboxName,
++     flag_descriptions::kMacV2SandboxDescription, kOsMac,
++     FEATURE_VALUE_TYPE(features::kMacV2Sandbox)},
+     {"mac-views-task-manager", flag_descriptions::kMacViewsTaskManagerName,
+      flag_descriptions::kMacViewsTaskManagerDescription, kOsMac,
+      FEATURE_VALUE_TYPE(features::kViewsTaskManager)},
+diff --git a/chrome/browser/flag_descriptions.cc b/chrome/browser/flag_descriptions.cc
+index 6cc51bbfb19a25b59133408fc064ee7c607306d5..dbbe90e4ea6a39cba7ccf7bc2961baafd1067b08 100644
+--- a/chrome/browser/flag_descriptions.cc
++++ b/chrome/browser/flag_descriptions.cc
+@@ -2973,6 +2973,11 @@ const char kMacRTLDescription[] = "Mirrors the UI for RTL language users";
+ const char kMacTouchBarName[] = "Hardware Touch Bar";
+ const char kMacTouchBarDescription[] = "Control the use of the Touch Bar.";
+ 
++const char kMacV2SandboxName[] = "Mac V2 Sandbox";
++const char kMacV2SandboxDescription[] =
++    "Eliminates the unsandboxed warmup phase and sandboxes processes for their "
++    "entire life cycle.";
++
+ const char kMacViewsNativeAppWindowsName[] = "Toolkit-Views App Windows.";
+ const char kMacViewsNativeAppWindowsDescription[] =
+     "Controls whether to use Toolkit-Views based Chrome App windows.";
+diff --git a/chrome/browser/flag_descriptions.h b/chrome/browser/flag_descriptions.h
+index 944695782cbaadd5bc5713b35f0e6882f851d399..df99961ed6cdd4747ec413443fa324e681212c5a 100644
+--- a/chrome/browser/flag_descriptions.h
++++ b/chrome/browser/flag_descriptions.h
+@@ -1800,6 +1800,9 @@ extern const char kMacRTLDescription[];
+ extern const char kMacTouchBarName[];
+ extern const char kMacTouchBarDescription[];
+ 
++extern const char kMacV2SandboxName[];
++extern const char kMacV2SandboxDescription[];
++
+ extern const char kMacViewsNativeAppWindowsName[];
+ extern const char kMacViewsNativeAppWindowsDescription[];
+ 
+diff --git a/content/browser/child_process_launcher_helper_mac.cc b/content/browser/child_process_launcher_helper_mac.cc
+index 60a5a64701562ec205342cdb740e3b5f78859453..c1b02ef4855a0ef4e57a44cb0bf68ad70554c3dd 100644
+--- a/content/browser/child_process_launcher_helper_mac.cc
++++ b/content/browser/child_process_launcher_helper_mac.cc
+@@ -73,8 +73,34 @@ bool ChildProcessLauncherHelper::BeforeLaunchOnLauncherThread(
+       command_line_->HasSwitch(service_manager::switches::kNoSandbox) ||
+       service_manager::IsUnsandboxedSandboxType(sandbox_type);
+ 
+-  bool use_v2 =
+-      !no_sandbox && (sandbox_type != service_manager::SANDBOX_TYPE_GPU);
++  // TODO(kerrnel): Delete this switch once the V2 sandbox is always enabled.
++  bool use_v2 = base::FeatureList::IsEnabled(features::kMacV2Sandbox);
++
++  switch (sandbox_type) {
++    case service_manager::SANDBOX_TYPE_NO_SANDBOX:
++      break;
++    case service_manager::SANDBOX_TYPE_CDM:
++    case service_manager::SANDBOX_TYPE_PPAPI:
++    case service_manager::SANDBOX_TYPE_RENDERER:
++    case service_manager::SANDBOX_TYPE_UTILITY:
++    case service_manager::SANDBOX_TYPE_NACL_LOADER:
++    case service_manager::SANDBOX_TYPE_PDF_COMPOSITOR:
++    case service_manager::SANDBOX_TYPE_PROFILING:
++      // If the feature experiment is enabled and this process type supports
++      // the v2 sandbox, use it.
++      use_v2 &= true;
++      break;
++    case service_manager::SANDBOX_TYPE_AUDIO:
++      // The audio service only exists with the v2 sandbox.
++      use_v2 |= true;
++      break;
++    default:
++      // This is a 'break' because the V2 sandbox is not enabled for all
++      // processes yet, and so there are sandbox types like NETWORK that
++      // should not be run under the V2 sandbox.
++      use_v2 = false;
++      break;
++  }
+ 
+   if (use_v2 && !no_sandbox) {
+     // Generate the profile string.
+@@ -107,16 +133,8 @@ bool ChildProcessLauncherHelper::BeforeLaunchOnLauncherThread(
+       case service_manager::SANDBOX_TYPE_PROFILING:
+         profile += service_manager::kSeatbeltPolicyString_utility;
+         break;
+-      case service_manager::SANDBOX_TYPE_NETWORK:
+-        // Put a separate CHECK() for the network sandbox so that crash reports
+-        // will show which invalid case was hit.
+-        CHECK(false);
+-        break;
+-      case service_manager::SANDBOX_TYPE_INVALID:
+-      case service_manager::SANDBOX_TYPE_FIRST_TYPE:
+-      case service_manager::SANDBOX_TYPE_AFTER_LAST_TYPE:
++      default:
+         CHECK(false);
+-        break;
+     }
+ 
+     // Disable os logging to com.apple.diagnosticd which is a performance
+diff --git a/content/public/common/content_features.cc b/content/public/common/content_features.cc
+index df0296b70a8ca479654306d0ae0f6d1b0f3c483e..ae993af7d8329b370bfa2d21ae8e3da4dba2646e 100644
+--- a/content/public/common/content_features.cc
++++ b/content/public/common/content_features.cc
+@@ -656,6 +656,11 @@ const base::Feature kDeviceMonitorMac{"DeviceMonitorMac",
+ // Enable IOSurface based screen capturer.
+ const base::Feature kIOSurfaceCapturer{"IOSurfaceCapturer",
+                                        base::FEATURE_ENABLED_BY_DEFAULT};
++
++// The V2 sandbox on MacOS removes the unsandboed warmup phase and sandboxes the
++// entire life of the process.
++const base::Feature kMacV2Sandbox{"MacV2Sandbox",
++                                  base::FEATURE_ENABLED_BY_DEFAULT};
+ #endif  // defined(OS_MACOSX)
+ 
+ enum class VideoCaptureServiceConfiguration {
+diff --git a/content/public/common/content_features.h b/content/public/common/content_features.h
+index 9305262478f21f4f181fbc1764e107ae5013f180..92b056133854b55e2db5a2e6d495e5e1ee74cf18 100644
+--- a/content/public/common/content_features.h
++++ b/content/public/common/content_features.h
+@@ -159,6 +159,7 @@ CONTENT_EXPORT extern const base::Feature kWebUIPolymer2;
+ #if defined(OS_MACOSX)
+ CONTENT_EXPORT extern const base::Feature kDeviceMonitorMac;
+ CONTENT_EXPORT extern const base::Feature kIOSurfaceCapturer;
++CONTENT_EXPORT extern const base::Feature kMacV2Sandbox;
+ #endif  // defined(OS_MACOSX)
+ 
+ // DON'T ADD RANDOM STUFF HERE. Put it in the main section above in
+diff --git a/testing/variations/fieldtrial_testing_config.json b/testing/variations/fieldtrial_testing_config.json
+index 8db49786d59c9a0b3b38fbaff7c985f0af6de28d..62d3e6e96b010251ac30590fe574af20082578c2 100644
+--- a/testing/variations/fieldtrial_testing_config.json
++++ b/testing/variations/fieldtrial_testing_config.json
+@@ -2449,6 +2449,21 @@
+             ]
+         }
+     ],
++    "MacV2Sandbox": [
++        {
++            "platforms": [
++                "mac"
++            ],
++            "experiments": [
++                {
++                    "name": "Enabled",
++                    "enable_features": [
++                        "MacV2Sandbox"
++                    ]
++                }
++            ]
++        }
++    ],
+     "MediaFoundationH264Encoding": [
+         {
+             "platforms": [
