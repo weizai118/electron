@@ -189,7 +189,7 @@ void WebFrame::SetLayoutZoomLevelLimits(double min_level, double max_level) {
   web_frame_->View()->ZoomLimitsChanged(min_level, max_level);
 }
 
-void WebFrame::RegisterEmbedderCustomElement(
+void WebFrame::AllowGuestViewElementDefinition(
     v8::Local<v8::Function> register_cb) {
   blink::WebCustomElement::EmbedderNamesAllowedScope embedder_names_scope;
   v8::HandleScope handle_scope(isolate());
@@ -493,8 +493,8 @@ void WebFrame::BuildPrototype(v8::Isolate* isolate,
                  &WebFrame::SetVisualZoomLevelLimits)
       .SetMethod("setLayoutZoomLevelLimits",
                  &WebFrame::SetLayoutZoomLevelLimits)
-      .SetMethod("registerEmbedderCustomElement",
-                 &WebFrame::RegisterEmbedderCustomElement)
+      .SetMethod("allowGuestViewElementDefinition",
+                 &WebFrame::AllowGuestViewElementDefinition)
       .SetMethod("getWebFrameId", &WebFrame::GetWebFrameId)
       .SetMethod("setSpellCheckProvider", &WebFrame::SetSpellCheckProvider)
       .SetMethod("registerURLSchemeAsBypassingCSP",
